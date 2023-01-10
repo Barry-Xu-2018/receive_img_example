@@ -3,12 +3,14 @@
 #include <atomic>
 #include <condition_variable>
 #include <memory.h>
+#include <memory>
 #include <mutex>
 #include <thread>
 
 #include "include/input_param_parser.hpp"
 #include "include/img_msg.hpp"
 #include "include/mqtt_subscription.hpp"
+#include "include/msg_queue.hpp"
 
 // Exit flag
 std::atomic_bool g_request_exit{false};
@@ -21,12 +23,13 @@ static void signal_handler(int signal)
   g_main_thread_cond.notify_one();
 }
 
-static void data_process(std::shared_ptr<MqttSubscription> sub)
-{
+static void
+data_process(std::shared_ptr<MqttSubscription> sub,
+             std::shared_ptr<MsgQueue<std::vector<uint8_t>>> queue) {
   std::printf("data_process thread start !!!\n");
   sub->init();
   while(!g_request_exit) {
-    auto serialized_msg = sub->get_msg_from_queue();
+    auto serialized_msg = queue->get_msg_from_queue();
     if (serialized_msg.get() == nullptr) {
       break;
     }
@@ -80,9 +83,13 @@ int main(int argc, char ** argv)
   std::cout << "  Broker port: " << broker_port << std::endl;
   std::cout << "        Topic: " << topic << std::endl;
 
-  auto sub = std::make_shared<MqttSubscription>(mqtt_broker_ip, broker_port, topic);
+  auto msg_queue = std::make_shared<MsgQueue<std::vector<uint8_t>>>();
 
-  auto deserialized_data_thread = std::make_shared<std::thread>(data_process, sub);
+  auto sub =
+      std::make_shared<MqttSubscription>(mqtt_broker_ip, broker_port, topic, msg_queue);
+
+  auto deserialized_data_thread =
+      std::make_shared<std::thread>(data_process, sub, msg_queue);
 
   // main thread enter wait status
   if (!g_request_exit) {
@@ -91,9 +98,7 @@ int main(int argc, char ** argv)
       return g_request_exit == true;
     });
   }
-
-  std::printf("Exit stage !!!\n");
-  sub->wakeup_for_exit();
+  msg_queue->wakeup_for_exit();
 
   if (deserialized_data_thread->joinable()) {
     deserialized_data_thread->joinable();

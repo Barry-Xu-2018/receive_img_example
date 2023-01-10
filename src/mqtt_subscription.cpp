@@ -1,10 +1,10 @@
 #include "include/mqtt_subscription.hpp"
 
 MqttSubscription::MqttSubscription(
-  std::string broker_ip, int32_t broker_port, std::string topic)
-  : broker_ip_(broker_ip),
-    broker_port_(broker_port),
-    topic_(topic) {}
+    std::string broker_ip, int32_t broker_port, std::string topic,
+    std::shared_ptr<MsgQueue<std::vector<uint8_t>>> &queue)
+    : broker_ip_(broker_ip), broker_port_(broker_port), topic_(topic),
+      queue_(queue) {}
 
 MqttSubscription::~MqttSubscription() {
   mosquitto_lib_cleanup();
@@ -66,18 +66,8 @@ std::string MqttSubscription::get_topic() {
   return topic_;
 }
 
-void MqttSubscription::put_recevied_msg_queue(std::shared_ptr<std::vector<uint8_t>> &msg) {
-  queue_.add_msg_to_queue(msg);
-}
-
-std::shared_ptr<std::vector<uint8_t>> MqttSubscription::get_msg_from_queue() {
-  return queue_.get_msg_from_queue();
-}
-
-void MqttSubscription::wakeup_for_exit() {
-  queue_.wakeup_for_exit();
-  mosquitto_disconnect(mosq_);
-  mosquitto_loop_stop(mosq_, true);
+std::shared_ptr<MsgQueue<std::vector<uint8_t>>> MqttSubscription::get_msg_queue() {
+	return queue_;
 }
 
 /* Callback called when the client receives a CONNACK message from the broker. */
@@ -153,5 +143,5 @@ void MqttSubscription::on_message(struct mosquitto *mosq, void *obj,
       static_cast<uint8_t *>(msg->payload),
       static_cast<uint8_t *>(msg->payload) + msg->payloadlen);
 
-  instance->put_recevied_msg_queue(serialized_data);
+  instance->get_msg_queue()->add_msg_to_queue(serialized_data);
 }

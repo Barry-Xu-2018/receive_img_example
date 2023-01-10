@@ -1,6 +1,7 @@
 #ifndef MQTT_SUBSCRIPTION_HPP__
 #define MQTT_SUBSCRIPTION_HPP__
 
+#include <memory>
 #include <mosquitto.h>
 
 #include <atomic>
@@ -12,7 +13,9 @@
 
 class MqttSubscription final{
 public:
-  MqttSubscription(std::string broker_ip, int32_t broker_port, std::string topic);
+  MqttSubscription(std::string broker_ip, int32_t broker_port,
+                   std::string topic,
+                   std::shared_ptr<MsgQueue<std::vector<uint8_t>>> &queue);
   ~MqttSubscription();
 
   void init();
@@ -22,13 +25,7 @@ public:
   bool is_connect_broker();
   void update_connect_status(bool is_connected);
 
-  void put_recevied_msg_queue(std::shared_ptr<std::vector<uint8_t>> &msg);
-
-  // May block for waiting msg
-  std::shared_ptr<std::vector<uint8_t>> get_msg_from_queue();
-
-  // Break block while get_msg_from_queue()
-  void wakeup_for_exit();
+  std::shared_ptr<MsgQueue<std::vector<uint8_t>>> get_msg_queue();
 
 private:
   std::string broker_ip_;
@@ -37,8 +34,7 @@ private:
 
   std::atomic_bool is_connected_{false};
 
-  std::mutex queue_mutex_;
-  MsgQueue<std::vector<uint8_t>> queue_;
+  std::shared_ptr<MsgQueue<std::vector<uint8_t>>> queue_;
 
   struct mosquitto * mosq_{nullptr};
 
