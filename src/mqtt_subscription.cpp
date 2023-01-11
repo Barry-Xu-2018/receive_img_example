@@ -135,7 +135,6 @@ void MqttSubscription::on_message(struct mosquitto *mosq, void *obj,
 {
   /* This blindly prints the payload, but the payload can be anything so take care. */
 	//printf("%s %d %s\n", msg->topic, msg->qos, (char *)msg->payload);
-  std::printf("+++ on_message\n");
 
   auto instance = static_cast<MqttSubscription *>(obj);
 

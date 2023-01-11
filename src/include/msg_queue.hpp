@@ -30,9 +30,7 @@ public:
       return get_msg();
     }
 
-    std::printf(">>>\n");
     wait_queue();
-    std::printf("<<<\n");
 
     if (exit_) {
       return std::shared_ptr<MSG_TYPE>();
