@@ -42,7 +42,7 @@ static void signal_handler(int signal)
 static void show_empty_window(uint32_t height = 300, uint32_t width = 350) {
   cv::Mat empty_frame = cv::Mat::zeros(300, 350, CV_8UC3);
   cv::putText(empty_frame, "Wait for BMP file", cv::Point(20, 150),
-              cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(0, 0, 255), 1);
+              cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(0, 255, 0), 1);
   cv::imshow("Show received BMP file", empty_frame);
   cv::waitKey(1);
 }
