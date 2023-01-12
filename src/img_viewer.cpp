@@ -1,3 +1,5 @@
+#include <sys/stat.h>
+
 #include "cista.h"
 
 #include <atomic>
@@ -27,26 +29,34 @@ std::condition_variable g_main_thread_cond;
 
 std::atomic_int64_t g_last_timestamp = 0;
 
+std::atomic_uint32_t g_height = 0;
+std::atomic_uint32_t g_width = 0;
+
 static void signal_handler(int signal)
 {
   g_request_exit = true;
   g_main_thread_cond.notify_one();
 }
 
-static void show_empty_window() {
-  cv::Mat empty_frame = cv::Mat::zeros(300, 300, CV_8UC3);
-  cv::putText(empty_frame, "Wait for BMP ...", cv::Point(20, 150),
+static void show_empty_window(uint32_t height = 300, uint32_t width = 350) {
+  cv::Mat empty_frame = cv::Mat::zeros(300, 350, CV_8UC3);
+  cv::putText(empty_frame, "Wait for BMP file", cv::Point(20, 150),
               cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(0, 0, 255), 1);
-  cv::imshow("Visualizer", empty_frame);
+  cv::imshow("Show received BMP file", empty_frame);
   cv::waitKey(1);
 }
 
 static void
 data_process(std::shared_ptr<MqttSubscription> sub,
-             std::shared_ptr<MsgQueue<std::vector<uint8_t>>> queue) {
+             std::shared_ptr<MsgQueue<std::vector<uint8_t>>> queue,
+             std::string output_path) {
   std::printf("data_process thread start !!!\n");
   sub->init();
   show_empty_window();
+
+  bool save_bmp_files = !output_path.empty();
+  uint32_t recevied_frame_index = 0;
+
   while(!g_request_exit) {
     auto serialized_msg = queue->get_msg_from_queue();
     if (serialized_msg.get() == nullptr) {
@@ -59,6 +69,11 @@ data_process(std::shared_ptr<MqttSubscription> sub,
     if (deserialized_msg->encoding == "rgb8") {
       cv::Mat colors[4];
       uint32_t pictureSize = deserialized_msg->height * deserialized_msg->width;
+
+      if (!g_height) {
+        g_height = deserialized_msg->height;
+        g_width = deserialized_msg->width;
+      }
 
       colors[2] = cv::Mat(deserialized_msg->height,
                           deserialized_msg->width, CV_8UC1,
@@ -76,9 +91,22 @@ data_process(std::shared_ptr<MqttSubscription> sub,
       cv::Mat resizeWin;
       uint8_t merge_num = imx500_img_transport::numChannels(deserialized_msg->encoding.str());
       cv::merge(colors, merge_num, resizeWin);
-      cv::Rect roi(cv::Point(0, 0), cv::Size(deserialized_msg->width, deserialized_msg->height));
 
-      cv::imshow("Visualizer", resizeWin(roi));
+      //cv::Rect roi(cv::Point(0, 0), cv::Size(deserialized_msg->width, deserialized_msg->height));
+      //cv::imshow("Show received BMP file", resizeWin(roi));
+
+      if(save_bmp_files) {
+        std::string output_file = output_path + "/frame_" +
+                                  std::to_string(recevied_frame_index++) + ".bmp";
+        cv::imwrite(output_file, resizeWin);
+      }
+
+      cv::Mat resizeImg;
+      cv::resize(
+          resizeWin, resizeImg,
+          cv::Size(deserialized_msg->width + 50, deserialized_msg->height));
+
+      cv::imshow("Show received BMP file", resizeImg);
       g_last_timestamp = deserialized_msg->timestamp;
       cv::waitKey(2);
     } else {
@@ -123,10 +151,22 @@ int main(int argc, char ** argv)
     return EXIT_FAILURE;
   }
 
+  std::string output_path = parser->get_output_path();
+
   std::cout << "Input parameter:" << std::endl;
-  std::cout << "    Broker IP: " << mqtt_broker_ip << std::endl;
-  std::cout << "  Broker port: " << broker_port << std::endl;
-  std::cout << "        Topic: " << topic << std::endl;
+  std::cout << "        Broker IP: " << mqtt_broker_ip << std::endl;
+  std::cout << "      Broker port: " << broker_port << std::endl;
+  std::cout << "            Topic: " << topic << std::endl;
+
+  if (!output_path.empty()) {
+    std::cout << "  BMP file output: " << output_path << std::endl;
+
+    struct stat sb;
+    if (stat(output_path.c_str(), &sb) != 0 || (sb.st_mode & S_IFDIR) ==0) {
+      std::cout << "Output path \"" << output_path << "\" doesn't exist !!!" << std::endl;
+      return EXIT_FAILURE;
+    }
+  }
 
   auto msg_queue = std::make_shared<MsgQueue<std::vector<uint8_t>>>();
 
@@ -134,7 +174,7 @@ int main(int argc, char ** argv)
       std::make_shared<MqttSubscription>(mqtt_broker_ip, broker_port, topic, msg_queue);
 
   auto deserialized_data_thread =
-      std::make_shared<std::thread>(data_process, sub, msg_queue);
+      std::make_shared<std::thread>(data_process, sub, msg_queue, output_path);
 
   auto updated_window = std::make_shared<std::thread>([](){
     static std::atomic_int64_t save_timestamp = 0;

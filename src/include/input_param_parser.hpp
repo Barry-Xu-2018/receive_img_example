@@ -47,12 +47,21 @@ public:
     return std::string();    
   }
 
+  const std::string get_output_path() {
+    if (cmdOptExists("-o") && !getOneOption("-o").empty()) {
+      return getOneOption("-o");
+    }
+
+    return std::string();
+  }
+
   void show_usage() {
     std::cout << "Usage: "
       << program_name_ 
       << " -a MQTT_Broker_IP_Addr"
       << " -p Server_TCP_Port"
-      << " -t Topic" << std::endl;
+      << " -t Topic"
+      << " [-o Output_BMP_FILE_PATH]";
   }  
 
 private:
