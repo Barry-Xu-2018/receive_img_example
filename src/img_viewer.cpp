@@ -27,10 +27,11 @@ std::atomic_bool g_request_exit{false};
 std::mutex g_main_thread_mutex;
 std::condition_variable g_main_thread_cond;
 
-std::atomic_int64_t g_last_timestamp = 0;
-
 std::atomic_uint32_t g_height = 0;
 std::atomic_uint32_t g_width = 0;
+
+std::mutex last_show_time_mutex;
+std::chrono::time_point<std::chrono::system_clock> last_show_time;
 
 static void signal_handler(int signal)
 {
@@ -101,13 +102,18 @@ data_process(std::shared_ptr<MqttSubscription> sub,
         cv::imwrite(output_file, resizeWin);
       }
 
+      {
+        std::lock_guard<std::mutex> lock(last_show_time_mutex);
+        last_show_time = std::chrono::system_clock::now();
+      }
+
       cv::Mat resizeImg;
       cv::resize(
           resizeWin, resizeImg,
           cv::Size(deserialized_msg->width + 50, deserialized_msg->height));
 
       cv::imshow("Show received BMP file", resizeImg);
-      g_last_timestamp = deserialized_msg->timestamp;
+
       cv::waitKey(2);
     } else {
       std::cout << "Unsupported encoding " << deserialized_msg->encoding << " !!!" << std::endl;
@@ -177,14 +183,21 @@ int main(int argc, char ** argv)
       std::make_shared<std::thread>(data_process, sub, msg_queue, output_path);
 
   auto updated_window = std::make_shared<std::thread>([](){
-    static std::atomic_int64_t save_timestamp = 0;
+    int64_t save_timestamp = 0;
     while (!g_request_exit) {
-      if (save_timestamp == g_last_timestamp) {
-        show_empty_window();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-      } else {
-        save_timestamp.exchange(g_last_timestamp);
+
+      auto now = std::chrono::system_clock::now();
+
+      std::chrono::duration<double> diff;
+      {
+        std::lock_guard<std::mutex> lock(last_show_time_mutex);
+        diff = now - last_show_time;
       }
+
+      if (diff > std::chrono::seconds(1)) {
+        show_empty_window();
+      }
+      std::this_thread::sleep_for(std::chrono::microseconds(300));
     }
   });
 
