@@ -61,7 +61,8 @@ public:
       << " -a MQTT_Broker_IP_Addr"
       << " -p Server_TCP_Port"
       << " -t Topic"
-      << " [-o Output_BMP_FILE_PATH]";
+      << " [-o Output_BMP_FILE_PATH]"
+      << std::endl;
   }  
 
 private:
