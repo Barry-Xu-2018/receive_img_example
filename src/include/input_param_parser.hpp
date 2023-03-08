@@ -28,7 +28,7 @@ public:
       return getOneOption("-a");
     }
 
-    return std::string();    
+    return std::string();
   }
 
   const std::string get_broker_port() {
@@ -36,7 +36,7 @@ public:
       return getOneOption("-p");
     }
 
-    return std::string();    
+    return std::string();
   }
 
   const std::string get_topic() {
@@ -44,7 +44,7 @@ public:
       return getOneOption("-t");
     }
 
-    return std::string();    
+    return std::string();
   }
 
   const std::string get_output_path() {
@@ -57,13 +57,13 @@ public:
 
   void show_usage() {
     std::cout << "Usage: "
-      << program_name_ 
+      << program_name_
       << " -a MQTT_Broker_IP_Addr"
       << " -p Server_TCP_Port"
       << " -t Topic"
       << " [-o Output_BMP_FILE_PATH]"
       << std::endl;
-  }  
+  }
 
 private:
   std::string program_name_;

@@ -101,7 +101,7 @@ void MqttSubscription::on_connect(struct mosquitto *mosq, void *obj, int reason_
     std::printf("Subscribe failed !\n");
 		mosquitto_disconnect(mosq);
     instance->update_connect_status(false);
-	}  
+	}
 }
 
 /* Callback called when the broker sends a SUBACK in response to a SUBSCRIBE. */
